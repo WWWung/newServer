@@ -428,4 +428,71 @@ router.get('/comments', (req, res) => {
   })
 })
 
+router.get('/follow', (req, res) => {
+  const sql = 'select id from followed where blogId=' + req.query.blogId + ' and userId=' + req.query.userId;
+  mysqlUtil.query(sql)
+  .then(rsl => {
+    if (rsl.length) {
+      res.failure('已经收藏');
+    } else {
+      const sql = 'insert into followed (blogId, userId) values(' + req.query.blogId + ',' + req.query.userId + ')';
+      mysqlUtil.query(sql)
+      .then(field => {
+        const data = {
+          id: field.insertId,
+          msg: '收藏成功'
+        }
+        res.success(data)
+      })
+      .catch(err => {
+        errHandler(err);
+        res.failure('收藏失败');
+      })
+    }
+  })
+  .catch(err => {
+    errHandler(err);
+    res.failure('收藏失败');
+  })
+})
+
+router.get('/unfollow', (req, res) => {
+  const sql = 'delete from followed where blogId=' + query.blogId + ' and userId=' + query.userId;
+  mysqlUtil.query(sql)
+  .then(rsl => {
+    res.success({ msg: "取消收藏成功" });
+  })
+  .catch(err => {
+    errHandler(err);
+    res.failure('取消收藏失败');
+  })
+})
+
+router.get('/followlist', (req, res) => {
+  const page = query.page || 1;
+  const pageCount = query.pageCount || 20;
+  const limitStart = (page - 1) * pageCount;
+  const data = {
+    page: Number.parseInt(page),
+    pageCount: Number.parseInt(pageCount)
+  }
+  const sql = `select a.id, a.userId, a.blogId, title, clickNumber, commentNumber from
+              (select followed.id as id, followed.userId, blogId, title, clickNumber from followed, article where blogId=article.id and followed.userId=` + query.userId + `)
+              as a left join (select count(id) as commentNumber, blogId from comment group by blogId) as b on b.blogId=a.blogId limit ` + limitStart + `, ` + pageCount;
+  mysqlUtil.query(sql)
+  .then(rsl => {
+    data.data = rsl;
+    const sql = 'select count(id) as total from followed where followed.userId=' + req.query.userId;
+    return mysqlUtil.query(sql);
+  })
+  .then(rsl => {
+    data.total = rsl[0].total;
+    res.success(data);
+  })
+  .catch(err => {
+    errHandler(err);
+    res.failure('获取收藏列表失败');
+  })
+})
+
 module.exports = router
